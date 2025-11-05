@@ -1,0 +1,36 @@
+# --- Archivos de entorno virtual ---
+venv/
+.env
+.env.*
+.venv/
+
+# --- Archivos del sistema ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# --- Archivos temporales ---
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Archivos de configuración del editor ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- Archivos de FastAPI / Python ---
+dist/
+build/
+*.egg-info/
+
+# --- Archivos específicos de Windows ---
+*.lnk
+.env
+.venv/
