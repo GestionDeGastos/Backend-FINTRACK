@@ -26,10 +26,10 @@ app.add_middleware(
 print("Registrando routers...")
 app.include_router(usuarios_router)
 app.include_router(auth_router)
-print("Routers registrados correctamente")
+print(" Routers registrados correctamente")
 
 for route in app.routes:
-    print(f"{route.path}")
+    print(f" {route.path}")
 
 # --- Ruta protegida de ejemplo ---
 @app.get("/perfil")
