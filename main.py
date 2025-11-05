@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # --- Importaciones desde src ---
 from src.routes.user_routes import router as usuarios_router
 from src.routes.auth_routes import router as auth_router
+from src.routes.ingresos_routes import router as ingresos_router
+from src.routes.gastos_routes import router as gastos_router
 from src.middleware.auth_middleware import verify_token
 
 app = FastAPI(title="API Gestión de Gastos")
@@ -23,13 +25,15 @@ app.add_middleware(
 )
 
 # --- Incluir routers ---
-print("Registrando routers...")
+print("📦 Registrando routers...")
 app.include_router(usuarios_router)
 app.include_router(auth_router)
-print(" Routers registrados correctamente")
+app.include_router(ingresos_router)
+app.include_router(gastos_router)
+print("✅ Routers registrados correctamente")
 
 for route in app.routes:
-    print(f" {route.path}")
+    print(f"🔹 {route.path}")
 
 # --- Ruta protegida de ejemplo ---
 @app.get("/perfil")
@@ -39,4 +43,4 @@ async def perfil(payload: dict = Depends(verify_token)):
 # --- Ruta raíz ---
 @app.get("/")
 def root():
-    return {"message": "API funcionando correctamente"}
+    return {"message": "API funcionando correctamente"}
