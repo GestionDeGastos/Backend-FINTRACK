@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 # --- Importaciones desde src ---
 from src.routes.user_routes import router as usuarios_router
+from src.routes.auth_routes import router as auth_router
+from src.middleware.auth_middleware import verify_token
 
 app = FastAPI(title="API Gestión de Gastos")
 
@@ -21,12 +23,18 @@ app.add_middleware(
 )
 
 # --- Incluir routers ---
-print("📦 Registrando routers...")
+print("Registrando routers...")
 app.include_router(usuarios_router)
-print("✅ Routers registrados correctamente")
+app.include_router(auth_router)
+print("Routers registrados correctamente")
 
 for route in app.routes:
-    print(f"🔹 {route.path}")
+    print(f"{route.path}")
+
+# --- Ruta protegida de ejemplo ---
+@app.get("/perfil")
+async def perfil(payload: dict = Depends(verify_token)):
+    return {"mensaje": "Acceso concedido a ruta protegida", "usuario": payload["sub"]}
 
 # --- Ruta raíz ---
 @app.get("/")
