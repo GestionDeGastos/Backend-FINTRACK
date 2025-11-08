@@ -6,6 +6,7 @@ from src.routes.user_routes import router as usuarios_router
 from src.routes.auth_routes import router as auth_router
 from src.routes.ingresos_routes import router as ingresos_router
 from src.routes.gastos_routes import router as gastos_router
+from src.routes.plan_ahorro_routes import router as plan_ahorro_router
 from src.middleware.auth_middleware import verify_token
 
 app = FastAPI(title="API Gestión de Gastos")
@@ -30,6 +31,7 @@ app.include_router(usuarios_router)
 app.include_router(auth_router)
 app.include_router(ingresos_router)
 app.include_router(gastos_router)
+app.include_router(plan_ahorro_router)
 print("✅ Routers registrados correctamente")
 
 for route in app.routes:
