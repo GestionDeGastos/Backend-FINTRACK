@@ -79,7 +79,7 @@ def login(payload: LoginIn):
     if not verify_password(payload.password, user["password"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    token = create_access_token({"sub": user["correo"]})
+    token = create_access_token({"sub": str(user["id"])})
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me")
