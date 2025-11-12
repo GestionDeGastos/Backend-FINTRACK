@@ -1,90 +1,73 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
-from src.schemas.plan_gestion_schemas import PlanGestionCreate, PlanGestionResp
-from src.services.plan_gestion_service import (
-    crear_plan,
-    obtener_planes,
-    obtener_plan_por_id,
-    actualizar_plan,
-    eliminar_plan,
-)
 from src.middleware.auth_middleware import verify_token
+from src.schemas.planGestion_schema import PlanGestionSchema
+from src.services.plan_gestion_service import generar_plan
+from src.database.supabase_client import supabase
 
-# Inicializa el router
-router = APIRouter(
-    prefix="/api/plan-gestion",
-    tags=["Plan de Gestión de Gastos"],
-    responses={404: {"description": "No encontrado"}}
-)
-
-# --------------------------------------------
-# 🟩 Crear un nuevo plan de gestión
-# --------------------------------------------
-@router.post("/", response_model=PlanGestionResp)
-def crear_plan_endpoint(plan: PlanGestionCreate, payload: dict = Depends(verify_token)):
-    """
-    Crea un nuevo plan de gestión de gasto asociado al usuario autenticado.
-    """
-    usuario_id = payload.get("sub")
-    nuevo_plan = crear_plan(usuario_id, plan.dict())
-    if not nuevo_plan:
-        raise HTTPException(status_code=400, detail="No se pudo crear el plan de gestión.")
-    return nuevo_plan
+router = APIRouter(prefix="/api/plan-gestion", tags=["Plan de Gestión"])
 
 
-# --------------------------------------------
-# 🟦 Obtener todos los planes del usuario
-# --------------------------------------------
-@router.get("/", response_model=List[PlanGestionResp])
-def obtener_planes_endpoint(payload: dict = Depends(verify_token)):
-    """
-    Obtiene todos los planes de gestión creados por el usuario autenticado.
-    """
-    usuario_id = payload.get("sub")
-    planes = obtener_planes(usuario_id)
-    return planes
+# CREAR PLAN DE GESTIÓN
+@router.post("/")
+async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    # Generar el plan financiero con la lógica existente
+    plan = generar_plan(
+        ingreso_total=data.ingreso_total,
+        ahorro_deseado=data.ahorro_deseado or 0,
+        duracion_meses=data.duracion_meses
+    )
+
+    # Verificar si hubo error en la generación
+    if "error" in plan:
+        raise HTTPException(status_code=400, detail=plan["error"])
+
+    # Guardar el plan en Supabase
+    nuevo_plan = {
+    "usuario_id": usuario_id,
+    "nombre_plan": data.nombre_plan,
+    "ingreso_total": data.ingreso_total,
+    "ahorro_deseado": data.ahorro_deseado or 0,
+    "duracion_meses": data.duracion_meses,
+    "created_at": plan["fecha_creacion"],  
+    "distribucion_gastos": plan["distribucion_gastos"],
+}
 
 
-# --------------------------------------------
-# 🟨 Obtener un plan específico por ID
-# --------------------------------------------
-@router.get("/{plan_id}", response_model=PlanGestionResp)
-def obtener_plan_por_id_endpoint(plan_id: int, payload: dict = Depends(verify_token)):
-    """
-    Obtiene la información de un plan de gestión específico.
-    """
-    usuario_id = payload.get("sub")
-    plan = obtener_plan_por_id(plan_id, usuario_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan no encontrado o sin permisos.")
-    return plan
+    try:
+        response = supabase.table("plan_gestion").insert(nuevo_plan).execute()
+        if not response.data:
+            raise HTTPException(status_code=400, detail="No se pudo guardar el plan en la base de datos")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error guardando el plan: {str(e)}")
+
+    # Retornar el plan completo al frontend
+    return {
+        "mensaje": "Plan de gestión creado correctamente",
+        "plan": plan
+    }
 
 
-# --------------------------------------------
-# 🟧 Actualizar un plan existente
-# --------------------------------------------
-@router.put("/{plan_id}", response_model=PlanGestionResp)
-def actualizar_plan_endpoint(plan_id: int, plan: PlanGestionCreate, payload: dict = Depends(verify_token)):
-    """
-    Actualiza un plan de gestión existente (solo si pertenece al usuario autenticado).
-    """
-    usuario_id = payload.get("sub")
-    actualizado = actualizar_plan(plan_id, usuario_id, plan.dict())
-    if not actualizado:
-        raise HTTPException(status_code=404, detail="No se pudo actualizar el plan (no encontrado o sin permisos).")
-    return actualizado
+# OBTENER TODOS LOS PLANES DE UN USUARIO
+@router.get("/")
+async def listar_planes(payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    try:
+        response = supabase.table("plan_gestion").select("*").eq("usuario_id", usuario_id).execute()
+        return response.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo planes: {str(e)}")
 
 
-# --------------------------------------------
-# 🟥 Eliminar un plan existente
-# --------------------------------------------
-@router.delete("/{plan_id}")
-def eliminar_plan_endpoint(plan_id: int, payload: dict = Depends(verify_token)):
-    """
-    Elimina un plan de gestión de gastos (solo si pertenece al usuario autenticado).
-    """
-    usuario_id = payload.get("sub")
-    eliminado = eliminar_plan(plan_id, usuario_id)
-    if not eliminado:
-        raise HTTPException(status_code=404, detail="Plan no encontrado o sin permisos para eliminarlo.")
-    return {"mensaje": "🗑️ Plan eliminado correctamente."}
+# OBTENER DETALLE DE UN PLAN POR ID
+@router.get("/{plan_id}")
+async def detalle_plan(plan_id: str, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    try:
+        response = supabase.table("plan_gestion").select("*").eq("id", plan_id).eq("usuario_id", usuario_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo plan: {str(e)}")

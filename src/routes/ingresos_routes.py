@@ -9,12 +9,12 @@ router = APIRouter(prefix="/ingresos", tags=["ingresos"])
 def crear_ingreso(ingreso: Ingreso, payload: dict = Depends(verify_token)):
     """Crea un nuevo ingreso para el usuario autenticado"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     
     data = {
         "usuario_id": usuario_id,
@@ -35,12 +35,12 @@ def crear_ingreso(ingreso: Ingreso, payload: dict = Depends(verify_token)):
 def obtener_ingresos(payload: dict = Depends(verify_token)):
     """Obtiene todos los ingresos del usuario autenticado"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     result = supabase.table("ingresos").select("*").eq("usuario_id", usuario_id).execute()
     
     return {
@@ -52,13 +52,13 @@ def obtener_ingresos(payload: dict = Depends(verify_token)):
 def obtener_ingreso(id: str, payload: dict = Depends(verify_token)):
     """Obtiene un ingreso específico"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("ingresos").select("*").eq("id", id).eq("usuario_id", usuario_id).execute()
+    usuario_id = user_result.data[0]["identificación"]
+    result = supabase.table("ingresos").select("*").eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
@@ -71,16 +71,16 @@ def obtener_ingreso(id: str, payload: dict = Depends(verify_token)):
 @router.put("/{id}")
 def actualizar_ingreso(id: str, ingreso: IngresoUpdate, payload: dict = Depends(verify_token)):
     """Actualiza un ingreso existente"""
-    user_email = payload["up"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_email = payload["sub"]
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     update_data = {k: v for k, v in ingreso.dict().items() if v is not None}
     
-    result = supabase.table("ingresos").update(update_data).eq("id", id).eq("usuario_id", usuario_id).execute()
+    result = supabase.table("ingresos").update(update_data).eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
@@ -94,13 +94,13 @@ def actualizar_ingreso(id: str, ingreso: IngresoUpdate, payload: dict = Depends(
 def eliminar_ingreso(id: str, payload: dict = Depends(verify_token)):
     """Elimina un ingreso"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("ingresos").delete().eq("id", id).eq("usuario_id", usuario_id).execute()
+    usuario_id = user_result.data[0]["identificación"]
+    result = supabase.table("ingresos").delete().eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
