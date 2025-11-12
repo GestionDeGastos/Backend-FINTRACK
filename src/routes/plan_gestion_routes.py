@@ -3,7 +3,7 @@ from src.middleware.auth_middleware import verify_token
 from src.schemas.planGestion_schema import PlanGestionSchema
 from src.services.plan_gestion_service import generar_plan
 from src.database.supabase_client import supabase
-
+from src.services.analisis_plan_service import analizar_plan 
 router = APIRouter(prefix="/api/plan-gestion", tags=["Plan de Gestión"])
 
 
@@ -71,3 +71,26 @@ async def detalle_plan(plan_id: str, payload: dict = Depends(verify_token)):
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo plan: {str(e)}")
+
+# Obtener detalles para el analisis 
+@router.get("/{plan_id}/analisis")
+async def analizar_plan_endpoint(plan_id: str, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    try:
+        # Buscar el plan del usuario
+        result = supabase.table("plan_gestion").select("*").eq("id", plan_id).eq("usuario_id", usuario_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+        plan_data = result.data[0]
+        analisis = analizar_plan(plan_data)
+
+        return {
+            "mensaje": "Análisis generado correctamente",
+            "plan_id": plan_id,
+            "analisis": analisis
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar análisis: {str(e)}")
