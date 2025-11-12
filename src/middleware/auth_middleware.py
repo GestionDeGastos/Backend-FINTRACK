@@ -1,20 +1,20 @@
-# src/middleware/auth_middleware.py
-from fastapi import Request, HTTPException
-import jwt
-import os
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt, os
 from dotenv import load_dotenv
 
 load_dotenv()
-
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 
-def verify_token(request: Request):
-    token = request.headers.get("Authorization")
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
     if not token:
         raise HTTPException(status_code=401, detail="Token no proporcionado")
     try:
-        payload = jwt.decode(token.split(" ")[1], SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")

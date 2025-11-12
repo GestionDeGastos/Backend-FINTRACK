@@ -1,5 +1,9 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
+
+bearer_scheme = HTTPBearer()
 
 # --- Importaciones desde src ---
 from src.routes.user_routes import router as usuarios_router
@@ -7,6 +11,8 @@ from src.routes.auth_routes import router as auth_router
 from src.routes.ingresos_routes import router as ingresos_router
 from src.routes.gastos_routes import router as gastos_router
 from src.middleware.auth_middleware import verify_token
+from src.routes.plan_gestion_routes import router as plan_gestion_router
+
 
 app = FastAPI(title="API Gestión de Gastos")
 
@@ -30,6 +36,8 @@ app.include_router(usuarios_router)
 app.include_router(auth_router)
 app.include_router(ingresos_router)
 app.include_router(gastos_router)
+app.include_router(plan_gestion_router)
+
 print("✅ Routers registrados correctamente")
 
 for route in app.routes:
