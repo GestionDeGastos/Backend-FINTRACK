@@ -9,12 +9,12 @@ router = APIRouter(prefix="/gastos", tags=["gastos"])
 def crear_gasto(gasto: Gasto, payload: dict = Depends(verify_token)):
     """Crea un nuevo gasto para el usuario autenticado"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     
     data = {
         "usuario_id": usuario_id,
@@ -35,12 +35,12 @@ def crear_gasto(gasto: Gasto, payload: dict = Depends(verify_token)):
 def obtener_gastos(payload: dict = Depends(verify_token)):
     """Obtiene todos los gastos del usuario autenticado"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     result = supabase.table("gastos").select("*").eq("usuario_id", usuario_id).execute()
     
     return {
@@ -52,13 +52,13 @@ def obtener_gastos(payload: dict = Depends(verify_token)):
 def obtener_gasto(id: str, payload: dict = Depends(verify_token)):
     """Obtiene un gasto específico"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("gastos").select("*").eq("id", id).eq("usuario_id", usuario_id).execute()
+    usuario_id = user_result.data[0]["identificación"]
+    result = supabase.table("gastos").select("*").eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
@@ -72,15 +72,15 @@ def obtener_gasto(id: str, payload: dict = Depends(verify_token)):
 def actualizar_gasto(id: str, gasto: GastoUpdate, payload: dict = Depends(verify_token)):
     """Actualiza un gasto existente"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = user_result.data[0]["identificación"]
     update_data = {k: v for k, v in gasto.dict().items() if v is not None}
     
-    result = supabase.table("gastos").update(update_data).eq("id", id).eq("usuario_id", usuario_id).execute()
+    result = supabase.table("gastos").update(update_data).eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
@@ -94,13 +94,13 @@ def actualizar_gasto(id: str, gasto: GastoUpdate, payload: dict = Depends(verify
 def eliminar_gasto(id: str, payload: dict = Depends(verify_token)):
     """Elimina un gasto"""
     user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
+    user_result = supabase.table("usuarios").select("identificación").eq("correo", user_email).execute()
     
     if not user_result.data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("gastos").delete().eq("id", id).eq("usuario_id", usuario_id).execute()
+    usuario_id = user_result.data[0]["identificación"]
+    result = supabase.table("gastos").delete().eq("identificación", id).eq("usuario_id", usuario_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
