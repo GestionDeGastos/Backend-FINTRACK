@@ -29,8 +29,7 @@ async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(ve
     "nombre_plan": data.nombre_plan,
     "ingreso_total": data.ingreso_total,
     "ahorro_deseado": data.ahorro_deseado or 0,
-    "duracion_meses": data.duracion_meses,
-    "created_at": plan["fecha_creacion"],  
+    "duracion_meses": data.duracion_meses, 
     "distribucion_gastos": plan["distribucion_gastos"],
 }
 
