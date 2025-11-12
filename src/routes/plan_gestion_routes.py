@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from src.middleware.auth_middleware import verify_token
-from src.schemas.plan_gestion_schemas import PlanGestionCreate
+from src.schemas.planGestion_schema import PlanGestionSchema
 from src.services.plan_gestion_service import crear_plan, obtener_planes, obtener_plan_por_id
 
 router = APIRouter(prefix="/api/plan-gestion", tags=["Plan de Gestión"])
 
 @router.post("/")
-async def crear_plan_gestion(data: PlanGestionCreate, payload: dict = Depends(verify_token)):
+async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(verify_token)):
     usuario_id = payload["sub"]
     try:
         return await crear_plan(usuario_id, data)
