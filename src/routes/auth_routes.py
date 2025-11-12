@@ -79,24 +79,31 @@ def login(payload: LoginIn):
     if not verify_password(payload.password, user["password"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    token = create_access_token({"sub": str(user["id"])})
+    token = create_access_token({"sub": user["id"]})
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me")
 def read_users_me(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        correo: str = payload.get("sub")
-        if correo is None:
+        user_id = payload.get("sub")  # ahora es el ID (UUID)
+        if user_id is None:
             raise HTTPException(status_code=401, detail="Token inválido o expirado")
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    user = get_user_by_email(correo)
-    if not user:
+    # Buscar al usuario por su ID en Supabase
+    url = f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}?id=eq.{user_id}"
+    res = requests.get(url, headers=headers)
+    if res.status_code != 200:
+        raise HTTPException(status_code=500, detail="Error al conectar con Supabase")
+    data = res.json()
+    if not data:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    user = data[0]
     return {
-        "usuario_actual": user.get("correo"),
+        "id": user.get("id"),
+        "correo": user.get("correo"),
         "nombre": user.get("nombre"),
     }
