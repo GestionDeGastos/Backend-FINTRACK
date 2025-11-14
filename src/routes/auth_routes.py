@@ -8,7 +8,6 @@ import requests
 from dotenv import load_dotenv
 from src.auth.utils import hash_password, verify_password, create_access_token
 
-# Cargar variables del entorno
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -61,32 +60,49 @@ def insert_user(nombre: str, correo: str, hashed_password: str):
     return res.json()
 
 # ---------- ENDPOINTS ----------
+
+# ✅ MANEJAR OPTIONS
+@router.options("/login")
+async def options_login():
+    return {"status": "ok"}
+
+@router.options("/register")
+async def options_register():
+    return {"status": "ok"}
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterIn):
+    print(f"📝 Intentando registrar usuario: {payload.correo}")
     existing = get_user_by_email(payload.correo)
     if existing:
+        print(f"❌ Usuario ya existe: {payload.correo}")
         raise HTTPException(status_code=400, detail="El usuario ya existe")
 
     hashed_pw = hash_password(payload.password)
-    insert_user(payload.nombre, payload.correo, hashed_pw)
+    result = insert_user(payload.nombre, payload.correo, hashed_pw)
+    print(f"✅ Usuario registrado: {payload.correo}")
     return {"msg": "Usuario registrado correctamente"}
 
 @router.post("/login")
 def login(payload: LoginIn):
+    print(f"🔐 Intentando login: {payload.correo}")
     user = get_user_by_email(payload.correo)
     if not user:
+        print(f"❌ Usuario no encontrado: {payload.correo}")
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     if not verify_password(payload.password, user["password"]):
+        print(f"❌ Contraseña incorrecta: {payload.correo}")
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    token = create_access_token({"sub": user["id"]})
+    token = create_access_token({"sub": user["id"], "email": user["correo"]})
+    print(f"✅ Login exitoso: {payload.correo}")
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me")
 def read_users_me(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")  # ahora es el ID (UUID)
+        user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Token inválido o expirado")
     except JWTError:

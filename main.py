@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import Security
+from fastapi.security import HTTPBearer
 
 bearer_scheme = HTTPBearer()
 
@@ -13,21 +12,24 @@ from src.routes.gastos_routes import router as gastos_router
 from src.middleware.auth_middleware import verify_token
 from src.routes.plan_gestion_routes import router as plan_gestion_router
 
-
 app = FastAPI(title="API Gestión de Gastos")
 
-# --- Configurar CORS ---
-origins = [
-    "http://127.0.0.1:5501",
-    "http://localhost:5501",
-]
-
+# --- CORS MEJORADO ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "http://127.0.0.1:5501",
+        "http://localhost:5501",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "*",  # Temporalmente para desarrollo
+    ],
     allow_credentials=True,
-    allow_methods=["*"],         
+    allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,
 )
 
 # --- Incluir routers ---
@@ -51,4 +53,4 @@ async def perfil(payload: dict = Depends(verify_token)):
 # --- Ruta raíz ---
 @app.get("/")
 def root():
-    return {"message": "API funcionando correctamente"}
+    return {"message": "API funcionando correctamente"}
