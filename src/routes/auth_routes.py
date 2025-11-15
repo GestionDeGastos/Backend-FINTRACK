@@ -1,6 +1,7 @@
+# src/routes/auth_routes.py
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from jose import JWTError, jwt
 from datetime import datetime
 import os
@@ -25,11 +26,21 @@ headers = {
     "Content-Type": "application/json",
 }
 
-# ---------- MODELOS ----------
+# ---------- MODELOS ACTUALIZADOS ----------
 class RegisterIn(BaseModel):
-    nombre: str = Field(..., min_length=2)
+    nombre: str = Field(..., min_length=2, max_length=100)
+    apellido: str = Field(..., min_length=2, max_length=100)
+    edad: int = Field(..., ge=18, le=120)
     correo: EmailStr
     password: str = Field(..., min_length=8)
+    
+    @validator('edad')
+    def validate_edad(cls, v):
+        if v < 18:
+            raise ValueError('Debes ser mayor de 18 años para registrarte')
+        if v > 120:
+            raise ValueError('Edad no válida')
+        return v
 
 class LoginIn(BaseModel):
     correo: EmailStr
@@ -44,10 +55,12 @@ def get_user_by_email(email: str):
     data = res.json()
     return data[0] if data else None
 
-def insert_user(nombre: str, correo: str, hashed_password: str):
+def insert_user(nombre: str, apellido: str, edad: int, correo: str, hashed_password: str):
     url = f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}"
     payload = {
         "nombre": nombre,
+        "apellido": apellido,
+        "edad": edad,
         "correo": correo,
         "password": hashed_password,
         "fecha_registro": datetime.utcnow().isoformat()
@@ -61,7 +74,6 @@ def insert_user(nombre: str, correo: str, hashed_password: str):
 
 # ---------- ENDPOINTS ----------
 
-# ✅ MANEJAR OPTIONS
 @router.options("/login")
 async def options_login():
     return {"status": "ok"}
@@ -79,7 +91,7 @@ def register(payload: RegisterIn):
         raise HTTPException(status_code=400, detail="El usuario ya existe")
 
     hashed_pw = hash_password(payload.password)
-    result = insert_user(payload.nombre, payload.correo, hashed_pw)
+    result = insert_user(payload.nombre, payload.apellido, payload.edad, payload.correo, hashed_pw)
     print(f"✅ Usuario registrado: {payload.correo}")
     return {"msg": "Usuario registrado correctamente"}
 
@@ -108,7 +120,6 @@ def read_users_me(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    # Buscar al usuario por su ID en Supabase
     url = f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}?id=eq.{user_id}"
     res = requests.get(url, headers=headers)
     if res.status_code != 200:
@@ -122,4 +133,7 @@ def read_users_me(token: str = Depends(oauth2_scheme)):
         "id": user.get("id"),
         "correo": user.get("correo"),
         "nombre": user.get("nombre"),
+        "apellido": user.get("apellido"),
+        "edad": user.get("edad"),
+        "foto_perfil": user.get("foto_perfil"),
     }
