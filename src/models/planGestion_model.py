@@ -11,6 +11,8 @@ class PlanGestion(BaseModel):
     ahorro_deseado: Optional[float] = None
     duracion_meses: int
     distribucion_gastos: Optional[Dict[str, float]] = None  # Se genera automáticamente
+    porcentajes_personalizados: Optional[Dict[str, float]] = None
+    editable: Optional[bool] = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

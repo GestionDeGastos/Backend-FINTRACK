@@ -4,6 +4,8 @@ from src.schemas.planGestion_schema import PlanGestionSchema
 from src.services.plan_gestion_service import generar_plan
 from src.database.supabase_client import supabase
 from src.services.analisis_plan_service import analizar_plan 
+from src.schemas.plan_personalizar_schema import PlanPersonalizarSchema
+from src.services.plan_personalizar_service import personalizar_plan
 router = APIRouter(prefix="/api/plan-gestion", tags=["Plan de Gestión"])
 
 
@@ -31,6 +33,8 @@ async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(ve
     "ahorro_deseado": data.ahorro_deseado or 0,
     "duracion_meses": data.duracion_meses, 
     "distribucion_gastos": plan["distribucion_gastos"],
+    "editable": False,
+    "porcentajes_personalizados": None
 }
 
 
@@ -44,7 +48,7 @@ async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(ve
     # Retornar el plan completo al frontend
     return {
         "mensaje": "Plan de gestión creado correctamente",
-        "plan": plan
+        "plan": response.data[0]
     }
 
 
@@ -95,3 +99,23 @@ async def analizar_plan_endpoint(plan_id: str, payload: dict = Depends(verify_to
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al generar análisis: {str(e)}")
 
+#Personalizar Plan
+@router.put("/{plan_id}/personalizar")
+async def personalizar_plan_endpoint(
+    plan_id: str,
+    data: PlanPersonalizarSchema,
+    payload: dict = Depends(verify_token)
+):
+    usuario_id = payload["sub"]
+
+    try:
+        # Intentar personalizar
+        result = personalizar_plan(plan_id, usuario_id, data.porcentajes)
+
+        return {
+            "mensaje": "Plan personalizado correctamente",
+            "resultado": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
