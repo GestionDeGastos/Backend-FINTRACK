@@ -12,6 +12,7 @@ from src.routes.gastos_routes import router as gastos_router
 from src.middleware.auth_middleware import verify_token
 from src.routes.plan_gestion_routes import router as plan_gestion_router
 from src.routes.perfil_routes import router as perfil_router
+from src.routes.gasto_extra_routes import router as gastos_extra_router
 
 app = FastAPI(title="API Gestión de Gastos - Sprint 3")
 
@@ -31,6 +32,7 @@ app.include_router(ingresos_router)
 app.include_router(gastos_router)
 app.include_router(plan_gestion_router)
 app.include_router(perfil_router)
+app.include_router(gastos_extra_router)
 
 print("✅ Routers registrados correctamente")
 
