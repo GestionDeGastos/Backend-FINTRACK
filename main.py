@@ -14,7 +14,19 @@ from src.routes.plan_gestion_routes import router as plan_gestion_router
 from src.routes.perfil_routes import router as perfil_router
 from src.routes.gasto_extra_routes import router as gastos_extra_router
 
-app = FastAPI(title="API Gestión de Gastos - Sprint 3")
+
+#DASHBOARD
+from src.routes.dashboard_routes import router as dashboard_router
+
+
+app = FastAPI(title="API Gestión de Gastos")
+
+# --- Configurar CORS ---
+origins = [
+    "http://127.0.0.1:5501",
+    "http://localhost:5501",
+]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +46,9 @@ app.include_router(plan_gestion_router)
 app.include_router(perfil_router)
 app.include_router(gastos_extra_router)
 
+# 👉 **INCLUIR EL NUEVO ROUTER DEL DASHBOARD**
+app.include_router(dashboard_router)
+
 print("✅ Routers registrados correctamente")
 
 for route in app.routes:
@@ -41,4 +56,6 @@ for route in app.routes:
 
 @app.get("/")
 def root():
-    return {"message": "API funcionando correctamente - Sprint 3"}
+
+    return {"message": "API funcionando correctamente"}
+
