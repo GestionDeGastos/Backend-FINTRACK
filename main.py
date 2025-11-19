@@ -13,6 +13,9 @@ from src.routes.gastos_routes import router as gastos_router
 from src.middleware.auth_middleware import verify_token
 from src.routes.plan_gestion_routes import router as plan_gestion_router
 
+#DASHBOARD
+from src.routes.dashboard_routes import router as dashboard_router
+
 
 app = FastAPI(title="API Gestión de Gastos")
 
@@ -38,6 +41,9 @@ app.include_router(ingresos_router)
 app.include_router(gastos_router)
 app.include_router(plan_gestion_router)
 
+# 👉 **INCLUIR EL NUEVO ROUTER DEL DASHBOARD**
+app.include_router(dashboard_router)
+
 print("✅ Routers registrados correctamente")
 
 for route in app.routes:
@@ -51,4 +57,4 @@ async def perfil(payload: dict = Depends(verify_token)):
 # --- Ruta raíz ---
 @app.get("/")
 def root():
-    return {"message": "API funcionando correctamente"}
+    return {"message": "API funcionando correctamente"}
