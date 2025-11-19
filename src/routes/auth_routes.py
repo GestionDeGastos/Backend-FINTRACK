@@ -1,13 +1,13 @@
 # src/routes/auth_routes.py
 from fastapi import APIRouter, HTTPException, status, Depends
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from datetime import datetime
 import os
 import requests
 from dotenv import load_dotenv
 
 from src.auth.utils import hash_password, verify_password, create_access_token
-from src.middleware.auth_middleware import verify_token  # 🔹 usamos el mismo middleware que en el resto
+from src.middleware.auth_middleware import verify_token
 
 load_dotenv()
 
@@ -51,11 +51,10 @@ class LoginIn(BaseModel):
 def get_user_by_email(email: str):
     """
     Obtiene al usuario por correo desde Supabase.
-    Nos aseguramos de traer id, correo, password y nombre.
     """
     url = (
         f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}"
-        f"?select=id,correo,password,nombre,fecha_registro&correo=eq.{email}"
+        f"?select=id,correo,password,nombre,apellido,edad,foto_perfil&correo=eq.{email}"
     )
     res = requests.get(url, headers=headers)
     if res.status_code != 200:
@@ -65,7 +64,7 @@ def get_user_by_email(email: str):
     return data[0] if data else None
 
 
-def insert_user(nombre: str, correo: str, hashed_password: str):
+def insert_user(nombre: str, apellido: str, edad: int, correo: str, hashed_password: str):
     """
     Inserta un usuario nuevo en Supabase y regresa la fila creada.
     """
@@ -106,7 +105,7 @@ def register(payload: RegisterIn):
     Registro de usuario:
     - Verifica que el correo no exista
     - Hashea la contraseña
-    - Inserta en Supabase
+    - Inserta en Supabase con todos los campos
     """
     existing = get_user_by_email(payload.correo)
     if existing:
@@ -114,14 +113,13 @@ def register(payload: RegisterIn):
         raise HTTPException(status_code=400, detail="El usuario ya existe")
 
     hashed_pw = hash_password(payload.password)
-    insert_user(payload.nombre, payload.correo, hashed_pw)
+    insert_user(payload.nombre, payload.apellido, payload.edad, payload.correo, hashed_pw)
 
     return {"msg": "Usuario registrado correctamente"}
 
 
 @router.post("/login")
 def login(payload: LoginIn):
-
     """
     Login:
     - Busca usuario por correo
@@ -137,23 +135,18 @@ def login(payload: LoginIn):
         print(f"❌ Contraseña incorrecta: {payload.correo}")
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-
-    #  el sub es el UUID del usuario
     token = create_access_token({"sub": user["id"]})
 
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/me")
-
 def read_users_me(payload: dict = Depends(verify_token)):
     """
     Devuelve los datos básicos del usuario autenticado.
-    Usa el MISMO middleware verify_token que todo el backend,
-    así que funciona perfecto con el botón "Authorize" de Swagger.
+    Usa el MISMO middleware verify_token que todo el backend.
     """
-    user_id = payload["sub"]  # UUID del usuario
-
+    user_id = payload["sub"]
 
     url = f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}?id=eq.{user_id}"
     res = requests.get(url, headers=headers)
