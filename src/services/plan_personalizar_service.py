@@ -34,8 +34,8 @@ def personalizar_plan(plan_id: str, usuario_id: str, porcentajes_input: Dict[str
     plan = resp.data[0]
 
     # Validar si está editable
-    if plan.get("editable") is not True:
-        raise Exception("Este plan no puede editarse. Requiere un gasto extraordinario.")
+    #if plan.get("editable") is not True:
+    #    raise Exception("Este plan no puede editarse. Requiere un gasto extraordinario.")
 
     # Validar porcentajes
     porcentajes = validar_y_convertir_porcentajes(porcentajes_input)
