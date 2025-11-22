@@ -119,3 +119,21 @@ async def personalizar_plan_endpoint(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+#ELIMINAR PLAN
+@router.delete("/{plan_id}")
+async def eliminar_plan(plan_id: str, payload: dict = Depends(verify_token)):
+
+    usuario_id = payload["sub"]
+
+    # Verificar que el plan pertenece al usuario
+    resp = supabase.table("plan_gestion").select("*").eq("id", plan_id).eq("usuario_id", usuario_id).execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Plan no encontrado o no pertenece al usuario")
+
+    # Eliminar plan
+    delete_resp = supabase.table("plan_gestion").delete().eq("id", plan_id).eq("usuario_id", usuario_id).execute()
+    if delete_resp.data is None:
+        raise HTTPException(status_code=500, detail="No se pudo eliminar el plan")
+
+    return {"mensaje": "Plan eliminado correctamente"}
