@@ -19,24 +19,22 @@ def validar_y_convertir_porcentajes(porcentajes: Dict[str, float]) -> Dict[str, 
 
 def personalizar_plan(plan_id: str, usuario_id: str, porcentajes_input: Dict[str, float]) -> Dict[str, Any]:
     """
-    Personaliza un plan existente solo si está en editable=True.
+    Personaliza un plan existente.
+    Ahora cualquier plan es editable sin importar gastos extraordinarios.
     Guarda:
     - porcentajes_personalizados (100%)
     - distribucion_gastos recalculada
-    - editable=False después de personalizar
+    - editable siempre en TRUE
     """
 
-    # Obtener plan
+    # Obtener plan existente
     resp = supabase.table("plan_gestion").select("*").eq("id", plan_id).eq("usuario_id", usuario_id).execute()
     if not resp.data:
         raise Exception("Plan no encontrado")
 
     plan = resp.data[0]
 
-    # Validar si está editable
-    #if plan.get("editable") is not True:
-    #    raise Exception("Este plan no puede editarse. Requiere un gasto extraordinario.")
-
+    # YA NO SE VERIFICA, Siempre es Editable
     # Validar porcentajes
     porcentajes = validar_y_convertir_porcentajes(porcentajes_input)
 
@@ -44,17 +42,17 @@ def personalizar_plan(plan_id: str, usuario_id: str, porcentajes_input: Dict[str
     ahorro = plan.get("ahorro_deseado", 0)
     ingreso_disponible = ingreso_total - (ahorro or 0)
 
-    # Convertir fracciones a montos
+    # Convertir fracciones a montos reales
     distribucion_montos = {k: round(ingreso_disponible * v, 2) for k, v in porcentajes.items()}
 
     # Payload para actualizar
     update_payload = {
         "porcentajes_personalizados": {k: round(v * 100, 2) for k, v in porcentajes.items()},
         "distribucion_gastos": distribucion_montos,
-        "editable": False  # Se desactiva después de personalizar
+        "editable": True     # SIEMPRE EDITABLE
     }
 
-    # Actualizar en DB
+    # Actualizar en Supabase
     update = supabase.table("plan_gestion").update(update_payload).eq("id", plan_id).eq("usuario_id", usuario_id).execute()
 
     if not update.data:
@@ -64,3 +62,4 @@ def personalizar_plan(plan_id: str, usuario_id: str, porcentajes_input: Dict[str
     analisis = analizar_plan(new_plan)
 
     return {"plan": new_plan, "analisis": analisis}
+    
