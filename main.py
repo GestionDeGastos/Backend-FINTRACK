@@ -17,6 +17,7 @@ from src.routes.gasto_extra_routes import router as gastos_extra_router
 
 #DASHBOARD
 from src.routes.dashboard_routes import router as dashboard_router
+from src.routes.admin_routes import router as admin_router
 
 
 app = FastAPI(title="API Gestión de Gastos")
@@ -48,6 +49,7 @@ app.include_router(gastos_extra_router)
 
 # 👉 **INCLUIR EL NUEVO ROUTER DEL DASHBOARD**
 app.include_router(dashboard_router)
+app.include_router(admin_router)
 
 print("✅ Routers registrados correctamente")
 
