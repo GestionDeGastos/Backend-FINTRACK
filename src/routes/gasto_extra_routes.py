@@ -1,21 +1,49 @@
 from fastapi import APIRouter, HTTPException, Depends
-from src.schemas.gasto_extra_schema import GastoExtraCreate
-from src.services.gasto_extra_service import agregar_gasto_extra
-from src.middleware.auth_middleware import verify_token  
+from src.middleware.auth_middleware import verify_token
+from src.database.supabase_client import supabase
+from datetime import datetime
 
 router = APIRouter(prefix="/gastos", tags=["gastos"])
 
-@router.post("/extraordinario", status_code=201)
-def crear_gasto_extraordinario(payload: GastoExtraCreate, token_payload: dict = Depends(verify_token)):
-    """
-    Crea un gasto extraordinario y actualiza el saldo del plan.
-    Requiere que el token contenga el identificador del usuario en 'sub' (correo o id según tu JWT).
-    """
-    try:
-        usuario_sub = token_payload.get("sub")
-        # Si tu token usa el correo, puedes obtener usuario_id en DB si lo necesitas.
-        # Asumimos que plan_gestion.usuario_id coincide con token.sub (si usas id uuid aquí, debe ser id).
-        result = agregar_gasto_extra(payload.plan_id, usuario_sub, payload.dict())
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# ================================================================
+# POST /gastos_extra/{plan_id}
+# ================================================================
+@router.post("/gastos_extra/{plan_id}")
+async def registrar_gasto_extra(plan_id: str, body: dict, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    monto = body.get("monto")
+
+    if not monto or monto <= 0:
+        raise HTTPException(status_code=400, detail="Monto inválido")
+
+    # Obtener plan
+    plan_res = supabase.table("plan_gestion").select("*").eq("id", plan_id).single().execute()
+    if not plan_res.data:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    plan = plan_res.data
+    
+    ingreso = float(plan["ingreso_total"])
+    ahorro = float(plan["ahorro_deseado"])
+    distrib = dict(plan["distribucion_gastos"])
+
+    # Registrar gasto real
+    saldo_anterior = float(plan.get("saldo", ingreso - ahorro))
+
+    nuevo_saldo = saldo_anterior - monto
+
+    # Reducir desde distribución (solo si quieres reflejarlo ahí)
+    if "Otros" in distrib:
+        distrib["Otros"] = max(0, float(distrib["Otros"]) - monto)
+
+    # Guardar cambios
+    supabase.table("plan_gestion").update({
+        "distribucion_gastos": distrib,
+        "saldo": nuevo_saldo
+    }).eq("id", plan_id).execute()
+
+    return {
+        "mensaje": "Gasto extra registrado correctamente",
+        "saldo_anterior": saldo_anterior,
+        "saldo_nuevo": nuevo_saldo
+    }
