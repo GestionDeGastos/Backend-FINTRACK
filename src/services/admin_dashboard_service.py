@@ -53,7 +53,7 @@ def get_gastos_totales_sistema():
 def get_planes_creados():
     """Obtener total de planes creados en el sistema"""
     try:
-        resp = supabase.table("planes").select("id").execute()
+        resp = supabase.table("plan_gestion").select("id").execute()
         return len(resp.data or [])
     except Exception as e:
         print(f"Error obteniendo planes: {e}")
@@ -63,7 +63,7 @@ def get_planes_creados():
 def get_gastos_extraordinarios_totales():
     """Obtener total de gastos extraordinarios"""
     try:
-        resp = supabase.table("gastos_extraordinarios").select("monto").execute()
+        resp = supabase.table("gasto_extra").select("monto").execute()
         rows = resp.data or []
         
         total = 0
@@ -187,7 +187,7 @@ def get_total_gastos_usuario(user_id: str):
 def get_planes_activos_usuario(user_id: str):
     """Obtener cantidad de planes activos de un usuario"""
     try:
-        resp = supabase.table("planes").select("id").eq("usuario_id", user_id).eq("activo", True).execute()
+        resp = supabase.table("plan_gestion").select("id").eq("usuario_id", user_id).execute()
         return len(resp.data or [])
     except:
         return 0
@@ -211,7 +211,8 @@ def get_lista_usuarios_con_stats():
             lista_usuarios.append({
                 "id": user_id,
                 "nombre": usuario.get("nombre", "Sin nombre"),
-                "email": usuario.get("email", "Sin email"),
+                "email": usuario.get("correo") or usuario.get("email", "Sin email"),
+                "edad": usuario.get("edad", 0),
                 "total_ingresos": round(total_ingresos, 2),
                 "total_gastos": round(total_gastos, 2),
                 "ahorro": round(ahorro, 2),
@@ -284,7 +285,7 @@ def get_gastos_extraordinarios_usuario(user_id: str, limit: int = 5):
     try:
         resp = (
             supabase
-            .table("gastos_extraordinarios")
+            .table("gasto_extra") 
             .select("*")
             .eq("usuario_id", user_id)
             .order("fecha", desc=True)
@@ -332,7 +333,7 @@ def get_estadisticas_usuario_admin(user_id: str):
         return {
             "usuario_id": user_id,
             "nombre": usuario.get("nombre"),
-            "email": usuario.get("email"),
+            "email": usuario.get("correo") or usuario.get("email"),
             "fecha_registro": usuario.get("created_at"),
             "total_ingresos": round(total_ingresos, 2),
             "total_gastos": round(total_gastos, 2),
