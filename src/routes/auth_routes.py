@@ -6,8 +6,13 @@ import os
 import requests
 from dotenv import load_dotenv
 
-from src.auth.utils import hash_password, verify_password, create_access_token
+from src.auth.utils import hash_password, verify_password, create_access_token, generate_recovery_token, verify_recovery_token
+
 from src.middleware.auth_middleware import verify_token
+
+from src.auth.email_sender import send_recovery_email
+from src.auth.utils import generate_recovery_token, verify_recovery_token
+from src.models.auth_models import RecoverRequest, ResetRequest, ChangePasswordRequest
 
 load_dotenv()
 
@@ -340,3 +345,69 @@ def read_users_me(payload: dict = Depends(verify_token)):
         "foto_perfil": user.get("foto_perfil"),
         "rol": user.get("rol", "user"),  # ← INCLUIR ROL
     }
+
+
+# ========= RECOVER → Generar token y ENVIAR correo =======
+@router.post("/recover")
+def recover_password(payload: RecoverRequest):
+    user = get_user_by_email(payload.correo)
+    if not user:
+        raise HTTPException(status_code=404, detail="Correo no registrado")
+
+    token = generate_recovery_token({"sub": user["id"]}, expires_minutes=10)
+
+    # Enviar correo REAL
+    send_recovery_email(user["correo"], token)
+
+    return {"msg": "Correo enviado. Revisa tu bandeja."}
+
+
+# ====== RESET → Validar token y cambiar contraseña =======
+@router.post("/reset")
+def reset_password(payload: ResetRequest):
+    if payload.nueva_password != payload.confirmar_password:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
+
+    try:
+        token_data = verify_recovery_token(payload.token)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    user_id = token_data.get("sub")
+
+    hashed = hash_password(payload.nueva_password)
+    url = f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}?id=eq.{user_id}"
+
+    res = requests.patch(url, headers=headers, json={"password": hashed})
+
+    if res.status_code not in (200, 204):
+        raise HTTPException(status_code=500, detail="Error actualizando contraseña")
+
+    return {"msg": "Contraseña actualizada correctamente"}
+
+# ======= CHANGE-PASSWORD → Cambiar contraseña desde el perfil ==========
+@router.patch("/change-password")
+def change_password(payload: ChangePasswordRequest, token_payload: dict = Depends(verify_token)):
+
+    if payload.nueva != payload.confirmar:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
+
+    user_id = token_payload["sub"]
+    user = get_user_by_id(user_id)
+
+    if not verify_password(payload.actual, user["password"]):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+
+    hashed = hash_password(payload.nueva)
+
+    res = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/{USERS_TABLE}?id=eq.{user_id}",
+        headers=headers,
+        json={"password": hashed}
+    )
+
+    if res.status_code not in (200, 204):
+        raise HTTPException(status_code=500, detail="Error al actualizar contraseña")
+
+    return {"msg": "Contraseña cambiada correctamente"}
+ 
