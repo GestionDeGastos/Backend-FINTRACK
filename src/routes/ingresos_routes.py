@@ -5,17 +5,10 @@ from src.middleware.auth_middleware import verify_token
 
 router = APIRouter(prefix="/ingresos", tags=["ingresos"])
 
+# ---- crear ingreso normal
 @router.post("/", status_code=201)
 def crear_ingreso(ingreso: Ingreso, payload: dict = Depends(verify_token)):
-    """Crea un nuevo ingreso para el usuario autenticado"""
-    user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
-    
-    if not user_result.data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    usuario_id = user_result.data[0]["id"]
-    
+    usuario_id = payload["sub"]
     data = {
         "usuario_id": usuario_id,
         "concepto": ingreso.concepto,
@@ -24,88 +17,58 @@ def crear_ingreso(ingreso: Ingreso, payload: dict = Depends(verify_token)):
         "fecha": ingreso.fecha,
         "descripcion": ingreso.descripcion
     }
-    
     result = supabase.table("ingresos").insert(data).execute()
-    return {
-        "message": "Ingreso creado con éxito",
-        "data": result.data[0]
-    }
 
+    if not result.data:
+        raise HTTPException(status_code=500, detail="No se pudo crear el ingreso")
+
+    return {"message": "Ingreso creado con éxito", "data": result.data[0]}
+
+# ---- obtener ingresos
 @router.get("/")
 def obtener_ingresos(payload: dict = Depends(verify_token)):
-    """Obtiene todos los ingresos del usuario autenticado"""
-    user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
-    
-    if not user_result.data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = payload["sub"]
     result = supabase.table("ingresos").select("*").eq("usuario_id", usuario_id).execute()
-    
-    return {
-        "message": "Ingresos obtenidos",
-        "data": result.data
-    }
+    return {"message": "Ingresos obtenidos", "data": result.data}
 
+# ---- obtener ingreso por id
 @router.get("/{id}")
 def obtener_ingreso(id: str, payload: dict = Depends(verify_token)):
-    """Obtiene un ingreso específico"""
-    user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
-    
-    if not user_result.data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("ingresos").select("*").eq("id", id).eq("usuario_id", usuario_id).execute()
-    
+    usuario_id = payload["sub"]
+    result = (
+        supabase.table("ingresos")
+        .select("*").eq("id", id).eq("usuario_id", usuario_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
-    
-    return {
-        "message": "Ingreso encontrado",
-        "data": result.data[0]
-    }
+    return {"message": "Ingreso encontrado", "data": result.data[0]}
 
+# ---- actualizar ingreso
 @router.put("/{id}")
 def actualizar_ingreso(id: str, ingreso: IngresoUpdate, payload: dict = Depends(verify_token)):
-    """Actualiza un ingreso existente"""
-    user_email = payload["up"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
-    
-    if not user_result.data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    usuario_id = user_result.data[0]["id"]
+    usuario_id = payload["sub"]
     update_data = {k: v for k, v in ingreso.dict().items() if v is not None}
-    
-    result = supabase.table("ingresos").update(update_data).eq("id", id).eq("usuario_id", usuario_id).execute()
-    
+
+    result = (
+        supabase.table("ingresos")
+        .update(update_data).eq("id", id).eq("usuario_id", usuario_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
-    
-    return {
-        "message": "Ingreso actualizado con éxito",
-        "data": result.data[0]
-    }
 
+    return {"message": "Ingreso actualizado", "data": result.data[0]}
+
+# ---- eliminar ingreso
 @router.delete("/{id}")
 def eliminar_ingreso(id: str, payload: dict = Depends(verify_token)):
-    """Elimina un ingreso"""
-    user_email = payload["sub"]
-    user_result = supabase.table("usuarios").select("id").eq("correo", user_email).execute()
-    
-    if not user_result.data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    usuario_id = user_result.data[0]["id"]
-    result = supabase.table("ingresos").delete().eq("id", id).eq("usuario_id", usuario_id).execute()
-    
+    usuario_id = payload["sub"]
+    result = (
+        supabase.table("ingresos")
+        .delete().eq("id", id).eq("usuario_id", usuario_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Ingreso no encontrado")
-    
-    return {
-        "message": "Ingreso eliminado con éxito",
-        "id": id
-    }
+    return {"message": "Ingreso eliminado", "id": id}

@@ -1,90 +1,283 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
-from src.schemas.plan_gestion_schemas import PlanGestionCreate, PlanGestionResp
-from src.services.plan_gestion_service import (
-    crear_plan,
-    obtener_planes,
-    obtener_plan_por_id,
-    actualizar_plan,
-    eliminar_plan,
-)
 from src.middleware.auth_middleware import verify_token
+from src.schemas.planGestion_schema import PlanGestionSchema
+from src.schemas.plan_personalizar_schema import PlanPersonalizarSchema
+from src.services.plan_gestion_service import generar_plan
+from src.services.plan_personalizar_service import personalizar_plan
+from src.services.analisis_plan_service import analizar_plan
+from src.database.supabase_client import supabase
+from datetime import datetime
 
-# Inicializa el router
-router = APIRouter(
-    prefix="/api/plan-gestion",
-    tags=["Plan de Gestión de Gastos"],
-    responses={404: {"description": "No encontrado"}}
-)
-
-# --------------------------------------------
-# 🟩 Crear un nuevo plan de gestión
-# --------------------------------------------
-@router.post("/", response_model=PlanGestionResp)
-def crear_plan_endpoint(plan: PlanGestionCreate, payload: dict = Depends(verify_token)):
-    """
-    Crea un nuevo plan de gestión de gasto asociado al usuario autenticado.
-    """
-    usuario_id = payload.get("sub")
-    nuevo_plan = crear_plan(usuario_id, plan.dict())
-    if not nuevo_plan:
-        raise HTTPException(status_code=400, detail="No se pudo crear el plan de gestión.")
-    return nuevo_plan
+router = APIRouter(prefix="/api/plan-gestion", tags=["Plan de Gestión"])
 
 
-# --------------------------------------------
-# 🟦 Obtener todos los planes del usuario
-# --------------------------------------------
-@router.get("/", response_model=List[PlanGestionResp])
-def obtener_planes_endpoint(payload: dict = Depends(verify_token)):
-    """
-    Obtiene todos los planes de gestión creados por el usuario autenticado.
-    """
-    usuario_id = payload.get("sub")
-    planes = obtener_planes(usuario_id)
-    return planes
+# ================================================================
+# CREAR PLAN
+# ================================================================
+@router.post("/")
+async def crear_plan_gestion(data: PlanGestionSchema, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    plan = generar_plan(
+        ingreso_total=data.ingreso_total,
+        ahorro_deseado=data.ahorro_deseado or 0,
+        duracion_meses=data.duracion_meses
+    )
+
+    if "error" in plan:
+        raise HTTPException(status_code=400, detail=plan["error"])
+
+    nuevo_plan = {
+        "usuario_id": usuario_id,
+        "nombre_plan": data.nombre_plan,
+        "ingreso_total": data.ingreso_total,
+        "ahorro_deseado": data.ahorro_deseado or 0,
+        "duracion_meses": data.duracion_meses,
+        "distribucion_gastos": plan["distribucion_gastos"],
+        "editable": False,
+        "porcentajes_personalizados": None,
+        "saldo": data.ingreso_total - (data.ahorro_deseado or 0)
+    }
+
+    res = supabase.table("plan_gestion").insert(nuevo_plan).execute()
+
+    if not res.data:
+        raise HTTPException(status_code=500, detail="No se pudo guardar el plan")
+
+    return {"mensaje": "Plan creado", "plan": res.data[0]}
+
+# ================================================================
+# LISTAR PLANES
+# ================================================================
+@router.get("/")
+async def listar_planes(payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    res = supabase.table("plan_gestion").select("*").eq("usuario_id", usuario_id).execute()
+    return res.data or []
 
 
-# --------------------------------------------
-# 🟨 Obtener un plan específico por ID
-# --------------------------------------------
-@router.get("/{plan_id}", response_model=PlanGestionResp)
-def obtener_plan_por_id_endpoint(plan_id: int, payload: dict = Depends(verify_token)):
-    """
-    Obtiene la información de un plan de gestión específico.
-    """
-    usuario_id = payload.get("sub")
-    plan = obtener_plan_por_id(plan_id, usuario_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan no encontrado o sin permisos.")
-    return plan
+# ================================================================
+# ANALISIS DEL PLAN
+# ================================================================
+@router.get("/{plan_id}/analisis")
+async def analizar_plan_endpoint(plan_id: str, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    res = (
+        supabase.table("plan_gestion")
+        .select("*")
+        .eq("id", plan_id)
+        .eq("usuario_id", usuario_id)
+        .single()
+        .execute()
+    )
+
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    plan_data = res.data
+    analisis = analizar_plan(plan_data)
+
+    return {"mensaje": "Análisis generado", "plan_id": plan_id, "analisis": analisis}
+
+# REGISTRAR INGRESO EXTRA
+
+@router.post("/ingresos_extra/{plan_id}")
+def registrar_ingreso_extra(plan_id: int, data: dict, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    monto = data.get("monto")
+
+    if not monto or monto <= 0:
+        raise HTTPException(status_code=400, detail="Monto inválido")
+
+    ingreso_data = {
+        "usuario_id": usuario_id,
+        "concepto": "Ingreso Extra",
+        "nombre_fuente": "Ingreso adicional",
+        "monto": monto,
+        "fecha": data.get("fecha") or datetime.utcnow().isoformat(),
+        "descripcion": "Ingreso extraordinario registrado desde personalización"
+    }
+
+    supabase.table("ingresos").insert(ingreso_data).execute()
+
+    plan = (
+        supabase.table("plan_gestion")
+        .select("*")
+        .eq("id", plan_id)
+        .single()
+        .execute()
+    ).data
+
+    nuevo_ingreso = plan["ingreso_total"] + monto
+    ingreso_disponible = nuevo_ingreso - plan["ahorro_deseado"]
+
+    # Recalcular distribución proporcional
+    distrib = plan["distribucion_gastos"]
+    total_original = sum(distrib.values()) or 1
+
+    nueva_distribucion = {
+        cat: round(ingreso_disponible * (val / total_original), 2)
+        for cat, val in distrib.items()
+    }
+
+    nuevo_saldo = ingreso_disponible - sum(nueva_distribucion.values())
+
+    supabase.table("plan_gestion").update({
+        "ingreso_total": nuevo_ingreso,
+        "distribucion_gastos": nueva_distribucion,
+        "saldo": nuevo_saldo
+    }).eq("id", plan_id).execute()
+
+    return {"mensaje": "Ingreso extra registrado", "saldo": nuevo_saldo}
+
+# REGISTRAR GASTO EXTRA 
+
+@router.post("/gastos_extra/{plan_id}")
+async def registrar_gasto_extra(plan_id: str, body: dict, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+    monto = body.get("monto")
+
+    if not monto or monto <= 0:
+        raise HTTPException(status_code=400, detail="Monto inválido")
+
+    plan = (
+        supabase.table("plan_gestion")
+        .select("*")
+        .eq("id", plan_id)
+        .single()
+        .execute()
+    ).data
+
+    ingreso_total = float(plan["ingreso_total"])
+    ahorro = float(plan["ahorro_deseado"])
+    distrib = plan["distribucion_gastos"]
+    porcentajes = plan.get("porcentajes_personalizados")
+
+    #  Nuevo ingreso total REAL
+    nuevo_ingreso_total = ingreso_total - monto
+    if nuevo_ingreso_total < 0:
+        nuevo_ingreso_total = 0
+
+    # Ingreso disponible después del gasto
+    ingreso_disponible = nuevo_ingreso_total - ahorro
+    if ingreso_disponible < 0:
+        ingreso_disponible = 0
+
+    # Recalcular distribución proporcional a porcentajes o distribución original
+    nueva_distribucion = {}
+
+    if porcentajes:
+        # Si el usuario ya personalizó → usar porcentajes personalizados
+        for cat, pct in porcentajes.items():
+            nueva_distribucion[cat] = round(ingreso_disponible * (pct / 100), 2)
+    else:
+        # Si no, usar distribución original proporcionalmente
+        total_original = sum(distrib.values()) or 1
+        for cat, val in distrib.items():
+            nueva_distribucion[cat] = round(ingreso_disponible * (val / total_original), 2)
+
+    nuevo_saldo = ingreso_disponible - sum(nueva_distribucion.values())
+
+    supabase.table("plan_gestion").update({
+        "ingreso_total": nuevo_ingreso_total,
+        "distribucion_gastos": nueva_distribucion,
+        "saldo": nuevo_saldo,
+        "editable": True
+    }).eq("id", plan_id).execute()
+
+    return {"mensaje": "Gasto extra registrado", "saldo": nuevo_saldo}
 
 
-# --------------------------------------------
-# 🟧 Actualizar un plan existente
-# --------------------------------------------
-@router.put("/{plan_id}", response_model=PlanGestionResp)
-def actualizar_plan_endpoint(plan_id: int, plan: PlanGestionCreate, payload: dict = Depends(verify_token)):
-    """
-    Actualiza un plan de gestión existente (solo si pertenece al usuario autenticado).
-    """
-    usuario_id = payload.get("sub")
-    actualizado = actualizar_plan(plan_id, usuario_id, plan.dict())
-    if not actualizado:
-        raise HTTPException(status_code=404, detail="No se pudo actualizar el plan (no encontrado o sin permisos).")
-    return actualizado
+
+# ================================================================
+# PERSONALIZAR PORCENTAJES
+# ================================================================
+@router.put("/{plan_id}/personalizar")
+async def personalizar_porcentajes(plan_id: int, body: dict, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    porcentajes = body.get("porcentajes")
+    if not porcentajes:
+        raise HTTPException(status_code=400, detail="Faltan porcentajes")
+
+    total_pct = sum(porcentajes.values())
+    if abs(total_pct - 100) > 0.1:
+        raise HTTPException(status_code=400, detail="Los porcentajes deben sumar 100%")
+
+    plan = (
+        supabase.table("plan_gestion")
+        .select("*")
+        .eq("id", plan_id)
+        .eq("usuario_id", usuario_id)
+        .single()
+        .execute()
+    ).data
+
+    ingreso_total = float(plan["ingreso_total"])
+    ahorro = float(plan["ahorro_deseado"])
+    ingreso_total_real = ingreso_total  # ya viene ajustado por gastos extra
+    ingreso_disponible = ingreso_total_real - ahorro
 
 
-# --------------------------------------------
-# 🟥 Eliminar un plan existente
-# --------------------------------------------
+    nueva_distribucion = {
+        cat: round(ingreso_disponible * (pct / 100), 2)
+        for cat, pct in porcentajes.items()
+    }
+
+    saldo = ingreso_disponible - sum(nueva_distribucion.values())
+
+    supabase.table("plan_gestion").update({
+        "distribucion_gastos": nueva_distribucion,
+        "porcentajes_personalizados": porcentajes,
+        "saldo": saldo,
+        "editable": True
+    }).eq("id", plan_id).execute()
+
+    return {
+        "mensaje": "Plan personalizado correctamente",
+        "distribucion_gastos": nueva_distribucion,
+        "saldo": saldo
+    }
+
+@router.get("/{plan_id}")
+async def obtener_plan(plan_id: str, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    res = (
+        supabase.table("plan_gestion")
+        .select("id, usuario_id, nombre_plan, ingreso_total, ahorro_deseado, duracion_meses, distribucion_gastos, porcentajes_personalizados, saldo")
+        .eq("id", plan_id)
+        .eq("usuario_id", usuario_id)
+        .single()
+        .execute()
+    )
+
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    return res.data
+# ================================================================
+# ELIMINAR PLAN
+# ================================================================
 @router.delete("/{plan_id}")
-def eliminar_plan_endpoint(plan_id: int, payload: dict = Depends(verify_token)):
-    """
-    Elimina un plan de gestión de gastos (solo si pertenece al usuario autenticado).
-    """
-    usuario_id = payload.get("sub")
-    eliminado = eliminar_plan(plan_id, usuario_id)
-    if not eliminado:
-        raise HTTPException(status_code=404, detail="Plan no encontrado o sin permisos para eliminarlo.")
-    return {"mensaje": "🗑️ Plan eliminado correctamente."}
+async def eliminar_plan(plan_id: str, payload: dict = Depends(verify_token)):
+    usuario_id = payload["sub"]
+
+    # Verificar que el plan exista y sea del usuario
+    res = (
+        supabase.table("plan_gestion")
+        .select("*")
+        .eq("id", plan_id)
+        .eq("usuario_id", usuario_id)
+        .single()
+        .execute()
+    )
+
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    # Eliminar el plan
+    supabase.table("plan_gestion").delete().eq("id", plan_id).execute()
+
+    return {"mensaje": "Plan eliminado correctamente"}

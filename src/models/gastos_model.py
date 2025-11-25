@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
 
 class Gasto(BaseModel):
     categoria: str
@@ -7,6 +8,8 @@ class Gasto(BaseModel):
     monto: float
     fecha: str
     descripcion: Optional[str] = None
+    plan_id: Optional[UUID] = None      # ✔ IMPORTANTE
+    extraordinario: Optional[bool] = False   # ✔ IMPORTANTE
 
 class GastoUpdate(BaseModel):
     categoria: Optional[str] = None
@@ -14,3 +17,5 @@ class GastoUpdate(BaseModel):
     monto: Optional[float] = None
     fecha: Optional[str] = None
     descripcion: Optional[str] = None
+    plan_id: Optional[UUID] = None      # ✔ también en updates
+    extraordinario: Optional[bool] = None
