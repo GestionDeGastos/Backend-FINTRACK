@@ -37,3 +37,20 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def generate_recovery_token(data: dict, expires_minutes: int = 10) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    to_encode.update({"exp": expire, "type": "recovery"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_recovery_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "recovery":
+            raise ValueError("Token inválido para recuperación")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token expirado")
+    except Exception:
+        raise ValueError("Token inválido")
